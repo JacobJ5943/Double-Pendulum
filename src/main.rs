@@ -1,6 +1,4 @@
-use std::{
-    f32::consts::PI,
-};
+use std::f32::consts::PI;
 
 use eframe::egui;
 use egui::{Color32, Pos2, Stroke, Ui};
@@ -17,15 +15,23 @@ fn main() {
 #[derive(Default, Debug)]
 struct MyEguiApp {
     inner: Polar2,
-    inner_rod_length:f32,
-    outer_rod_length:f32,
+    inner_rod_length: f32,
+    outer_rod_length: f32,
+    theta_one_dot: f32,
+    theta_two_dot: f32,
     outer: Polar2,
     point: Pos2,
     is_dragging: bool,
+    inner_mass: f32,
+    outer_mass: f32,
 }
 
 impl MyEguiApp {
-    fn new(_cc: &eframe::CreationContext<'_>, inner_rod_length:f32, outer_rod_length:f32) -> Self {
+    fn new(
+        _cc: &eframe::CreationContext<'_>,
+        inner_rod_length: f32,
+        outer_rod_length: f32,
+    ) -> Self {
         Self {
             point: Pos2 { x: 1.0, y: 2.0 },
             is_dragging: false,
@@ -34,11 +40,15 @@ impl MyEguiApp {
                 theta: PI,
             },
             outer: Polar2 {
-                radius: inner_rod_length + outer_rod_length,
+                radius: outer_rod_length,
                 theta: PI,
             },
             inner_rod_length,
-            outer_rod_length
+            outer_rod_length,
+            theta_one_dot: 0.0,
+            theta_two_dot: 0.0,
+            inner_mass: 1.0,
+            outer_mass: 1.0,
         }
     }
 }
@@ -46,9 +56,9 @@ impl MyEguiApp {
 ///
 /// This will return the polar coordinates as if y was going up.
 /// That is theta is negative to what would be expected with y being positive going down the screen.
-/// 
+///
 /// The reasoning for this is that the equations of motion I am taking use y positive going up
-/// and it's been a while since I've done this level of math in school.  So I'm opting to just change 
+/// and it's been a while since I've done this level of math in school.  So I'm opting to just change
 /// my coordinates
 fn cartesian_to_polar(input: Pos2, center: Pos2) -> Polar2 {
     //https://brilliant.org/wiki/convert-cartesian-coordinates-to-polar/
@@ -80,8 +90,8 @@ fn cartesian_to_polar(input: Pos2, center: Pos2) -> Polar2 {
 /// This will return the x,y coordinate with respect to the origin being the top left of the screen
 /// with pos x going right
 /// with pos y going down
-/// 
-/// This relies on theta of PI / 2.0 being y positive. 
+///
+/// This relies on theta of PI / 2.0 being y positive.
 // the phrasing of this is weird
 fn polar_to_cartesian(input: &Polar2, center: Pos2) -> Pos2 {
     Pos2 {
@@ -98,9 +108,11 @@ impl MyEguiApp {
                 theta: PI,
             };
             self.outer = Polar2 {
-                radius: inner_rod_length + outer_rod_length,
+                radius: outer_rod_length,
                 theta: PI,
             };
+            self.theta_one_dot = 0.0;
+            self.theta_two_dot = 0.0;
         }
     }
 
@@ -115,28 +127,29 @@ impl MyEguiApp {
         let mut temp = Pos2 { x: 0.0, y: 0.0 };
         if ui.input().pointer.primary_down() {
             if let Some(thing) = { ui.input().pointer.interact_pos() } {
-                temp = polar_to_cartesian(&cartesian_to_polar(thing, center), center);
-                let thing = cartesian_to_polar(thing, center);
+                //temp = polar_to_cartesian(&cartesian_to_polar(thing, center), center);
+                //let thing = cartesian_to_polar(thing, center);
                 if self.is_dragging {
-                    self.outer = thing;
+                    self.outer = cartesian_to_polar(thing, center); // Might be able to not have this be the cneter later
+
                     if self.outer.radius > total_radius {
                         self.outer.radius = total_radius
                     }
-                } else if intersect_circle_polar(&self.outer, 15.0, &thing) {
-                    self.outer = thing;
+                } else if _intersect_circle(polar_to_cartesian(&self.outer, polar_to_cartesian(&self.inner, center)), 15.0, thing) {
+                    self.outer = cartesian_to_polar(thing, center); // Might be able to not have this be the cneter later
                     self.is_dragging = true;
                 }
 
                 if self.is_dragging {
                     // Update inner based on where outer is
                     let distance = self.outer.radius;
-                    if let Some((p1, p2)) = dbg!(calculate_intersecting_points(
+                    if let Some((p1, p2)) = calculate_intersecting_points(
                         center,
                         polar_to_cartesian(&self.outer, center),
                         distance,
                         inner_rod_length,
                         outer_rod_length // might have outer and inner backwards
-                    )) {
+                    ) {
                         let inner = polar_to_cartesian(&self.inner, center);
                         let delta_p1 = ((p1.x - inner.x).powi(2) + (p1.y - inner.y).powi(2)).sqrt();
                         let delta_p2 = ((p2.x - inner.x).powi(2) + (p2.y - inner.y).powi(2)).sqrt();
@@ -147,18 +160,19 @@ impl MyEguiApp {
 
                         if p1.x.is_nan() && p2.x.is_nan() {
                             // dbg!((p1,p2));
-                        } 
-                            else if delta_p1 > delta_p2 {
-                                self.inner = cartesian_to_polar(p2, center);
-                            } else {
-                                self.inner = cartesian_to_polar(p1, center);
-                            }
-                        
+                        } else if delta_p1 > delta_p2 {
+                            self.inner = cartesian_to_polar(p2, center);
+                        } else {
+                            self.inner = cartesian_to_polar(p1, center);
+                        }
+                            self.outer = cartesian_to_polar(polar_to_cartesian(&self.outer, center), polar_to_cartesian(&self.inner, center))
                     }
                 } // end update inner
             }
         } else {
             self.is_dragging = false;
+            self.theta_one_dot = 0.0;
+            self.theta_two_dot = 0.0;
         }
         ui.painter()
             .circle(temp, 10.0, Color32::WHITE, Stroke::default());
@@ -166,7 +180,7 @@ impl MyEguiApp {
 
     fn draw_pendulum(&mut self, ui: &mut Ui, center: Pos2) {
         let inner = polar_to_cartesian(&self.inner, center);
-        let outer = polar_to_cartesian(&self.outer, center);
+        let outer = polar_to_cartesian(&self.outer, inner);
         ui.painter().circle(
             center,
             15.0,
@@ -189,6 +203,7 @@ impl eframe::App for MyEguiApp {
             ui.label(format!("{},{}", self.point.x, self.point.y));
             let available_size = ui.available_size();
             let total_radius: f32 = self.inner_rod_length + self.outer_rod_length;
+            let time_interval = 0.1; // This should have a slider or something
             let center = Pos2 {
                 x: available_size.x / 2.0,
                 y: available_size.y / 2.0,
@@ -209,6 +224,7 @@ impl eframe::App for MyEguiApp {
         });
     }
 }
+
 
 /// this uses the sqrt(deltax ^2 + deltay^2) so if the delta is great enough an overflow may occur
 fn _intersect_circle(object_center: Pos2, object_radius: f32, clicked_pos: Pos2) -> bool {
@@ -277,29 +293,54 @@ mod tests {
         // This center will always have a positive x and y
         let center = Pos2 { x: 7.0, y: 3.0 };
         let tolerance = 0.00005;
-        test_polar_to_cartesian_helper(&Polar2 {
-                    radius: 1.0,
-                    theta: 0.0,
-                }, center, &Pos2 { x: 8.0, y: 3.0 }, tolerance);
+        test_polar_to_cartesian_helper(
+            &Polar2 {
+                radius: 1.0,
+                theta: 0.0,
+            },
+            center,
+            &Pos2 { x: 8.0, y: 3.0 },
+            tolerance,
+        );
 
-        test_polar_to_cartesian_helper(&Polar2 {
-                    radius: 2.0,
-                    theta: 0.0,
-                }, center, &Pos2 { x: 9.0, y: 3.0 }, tolerance);
-        test_polar_to_cartesian_helper(&Polar2 {
-                    radius: 2.0,
-                    theta: PI / 2.0,
-                }, center, &Pos2 { x: 7.0, y: 1.0 }, tolerance);
+        test_polar_to_cartesian_helper(
+            &Polar2 {
+                radius: 2.0,
+                theta: 0.0,
+            },
+            center,
+            &Pos2 { x: 9.0, y: 3.0 },
+            tolerance,
+        );
+        test_polar_to_cartesian_helper(
+            &Polar2 {
+                radius: 2.0,
+                theta: PI / 2.0,
+            },
+            center,
+            &Pos2 { x: 7.0, y: 1.0 },
+            tolerance,
+        );
 
-        test_polar_to_cartesian_helper(&Polar2 {
-                    radius: 2.0,
-                    theta: PI ,
-                }, center, &Pos2 { x: 5.0,y: 3.0 }, tolerance);
+        test_polar_to_cartesian_helper(
+            &Polar2 {
+                radius: 2.0,
+                theta: PI,
+            },
+            center,
+            &Pos2 { x: 5.0, y: 3.0 },
+            tolerance,
+        );
 
-        test_polar_to_cartesian_helper(&Polar2 {
-                    radius: 2.0,
-                    theta: 3.0*PI /2.0,
-                }, center, &Pos2 { x: 7.0, y: 5.0 }, tolerance);
+        test_polar_to_cartesian_helper(
+            &Polar2 {
+                radius: 2.0,
+                theta: 3.0 * PI / 2.0,
+            },
+            center,
+            &Pos2 { x: 7.0, y: 5.0 },
+            tolerance,
+        );
     }
     // Let's see how this works with floats
     // Might what to have a close enough so like
@@ -307,30 +348,54 @@ mod tests {
     fn test_polar_to_cartesian_center_origin() {
         let center = Pos2 { x: 0.0, y: 0.0 };
         let tolerance = 0.00005;
-        test_polar_to_cartesian_helper(&Polar2 {
-                    radius: 1.0,
-                    theta: 0.0,
-                }, center, &Pos2 { x: 1.0, y: 0.0 }, tolerance);
+        test_polar_to_cartesian_helper(
+            &Polar2 {
+                radius: 1.0,
+                theta: 0.0,
+            },
+            center,
+            &Pos2 { x: 1.0, y: 0.0 },
+            tolerance,
+        );
 
-        test_polar_to_cartesian_helper(&Polar2 {
-                    radius: 2.0,
-                    theta: 0.0,
-                }, center, &Pos2 { x: 2.0, y: 0.0 }, tolerance);
-        test_polar_to_cartesian_helper(&Polar2 {
-                    radius: 2.0,
-                    theta: PI / 2.0,
-                }, center, &Pos2 { x: 0.0, y: -2.0 }, tolerance);
+        test_polar_to_cartesian_helper(
+            &Polar2 {
+                radius: 2.0,
+                theta: 0.0,
+            },
+            center,
+            &Pos2 { x: 2.0, y: 0.0 },
+            tolerance,
+        );
+        test_polar_to_cartesian_helper(
+            &Polar2 {
+                radius: 2.0,
+                theta: PI / 2.0,
+            },
+            center,
+            &Pos2 { x: 0.0, y: -2.0 },
+            tolerance,
+        );
 
-        test_polar_to_cartesian_helper(&Polar2 {
-                    radius: 2.0,
-                    theta: PI,
-                }, center, &Pos2 { x: -2.0, y: 0.0 }, tolerance);
+        test_polar_to_cartesian_helper(
+            &Polar2 {
+                radius: 2.0,
+                theta: PI,
+            },
+            center,
+            &Pos2 { x: -2.0, y: 0.0 },
+            tolerance,
+        );
 
-        test_polar_to_cartesian_helper(&Polar2 {
-                    radius: 2.0,
-                    theta: 3.0 * PI / 2.0,
-                }, center, &Pos2 { x: 0.0, y: 2.0 }, tolerance);
-
+        test_polar_to_cartesian_helper(
+            &Polar2 {
+                radius: 2.0,
+                theta: 3.0 * PI / 2.0,
+            },
+            center,
+            &Pos2 { x: 0.0, y: 2.0 },
+            tolerance,
+        );
     }
 
     fn compare_pos2_with_tolerance(a: &Pos2, b: &Pos2, tolerance: f32) -> bool {
@@ -360,7 +425,7 @@ mod tests {
         )
     }
 
-fn test_polar_to_cartesian_helper(
+    fn test_polar_to_cartesian_helper(
         polar: &Polar2,
         center: Pos2,
         expected_cartesian: &Pos2,
@@ -442,6 +507,4 @@ fn test_polar_to_cartesian_helper(
             tolerance,
         );
     }
-
-    
 }
