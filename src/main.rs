@@ -28,6 +28,7 @@ struct MyEguiApp {
     counter: usize,
     steps_per_tick: usize,
     granularity: f32,
+    playing:bool
 }
 
 impl MyEguiApp {
@@ -57,6 +58,7 @@ impl MyEguiApp {
             counter: 0,
             steps_per_tick: 10,
             granularity: 0.01,
+            playing:true,
         }
     }
 }
@@ -275,7 +277,6 @@ const MAX_GRANULARITY: f32 = 0.1;
 impl eframe::App for MyEguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.label(format!("{},{}", self.point.x, self.point.y));
             ui.horizontal(|ui| {
                 ui.label("Inner rod length");
                 ui.add(egui::Slider::new(&mut self.inner.radius, 0.1..=500.0));
@@ -320,6 +321,18 @@ impl eframe::App for MyEguiApp {
 
             self.reset_button(ui);
 
+            if self.playing {
+                if ui.button("pause").clicked() {
+                    self.playing = false;
+                }
+            }
+
+            if ! self.playing {
+                if ui.button("resume").clicked() {
+                    self.playing = true;
+                }
+            }
+
             self.handle_primary_mouse_button_down(
                 ui,
                 center,
@@ -328,7 +341,8 @@ impl eframe::App for MyEguiApp {
                 self.outer.radius,
             );
 
-            if !self.is_dragging {
+
+            if !self.is_dragging && self.playing{
                 self.simulation_step();
             }
 
