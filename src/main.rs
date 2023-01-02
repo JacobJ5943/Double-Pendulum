@@ -86,7 +86,7 @@ fn cartesian_to_polar(input: Pos2, center: Pos2) -> Polar2 {
     // }
     Polar2 {
         radius: (delta_x.powi(2) + delta_y.powi(2)).sqrt(),
-        theta,
+        theta: theta + (PI / 2.0), // The addition is to rotate the pendulum 90 degrees to clockwise.
     }
 }
 
@@ -99,8 +99,8 @@ fn cartesian_to_polar(input: Pos2, center: Pos2) -> Polar2 {
 // the phrasing of this is weird
 fn polar_to_cartesian(input: &Polar2, center: Pos2) -> Pos2 {
     Pos2 {
-        x: center.x + (input.radius * f32::cos(input.theta)),
-        y: center.y + -1.0 * (input.radius * f32::sin(input.theta)),
+        x: center.x + (input.radius * f32::cos(input.theta - (PI / 2.0))),
+        y: center.y + -1.0 * (input.radius * f32::sin(input.theta - (PI / 2.0))),
     }
 }
 
@@ -411,7 +411,7 @@ mod tests {
                 theta: 0.0,
             },
             center,
-            &Pos2 { x: 8.0, y: 3.0 },
+            &Pos2 { x: 7.0, y: 4.0 },
             tolerance,
         );
 
@@ -421,7 +421,7 @@ mod tests {
                 theta: 0.0,
             },
             center,
-            &Pos2 { x: 9.0, y: 3.0 },
+            &Pos2 { x: 7.0, y: 5.0 },
             tolerance,
         );
         test_polar_to_cartesian_helper(
@@ -430,7 +430,7 @@ mod tests {
                 theta: PI / 2.0,
             },
             center,
-            &Pos2 { x: 7.0, y: 1.0 },
+            &Pos2 { x: 9.0, y: 3.0 },
             tolerance,
         );
 
@@ -440,7 +440,7 @@ mod tests {
                 theta: PI,
             },
             center,
-            &Pos2 { x: 5.0, y: 3.0 },
+            &Pos2 { x: 7.0, y: 1.0 },
             tolerance,
         );
 
@@ -450,7 +450,7 @@ mod tests {
                 theta: 3.0 * PI / 2.0,
             },
             center,
-            &Pos2 { x: 7.0, y: 5.0 },
+            &Pos2 { x: 5.0, y: 3.0 },
             tolerance,
         );
     }
@@ -466,7 +466,7 @@ mod tests {
                 theta: 0.0,
             },
             center,
-            &Pos2 { x: 1.0, y: 0.0 },
+            &Pos2 { x: 0.0, y: 1.0 },
             tolerance,
         );
 
@@ -476,7 +476,7 @@ mod tests {
                 theta: 0.0,
             },
             center,
-            &Pos2 { x: 2.0, y: 0.0 },
+            &Pos2 { x: 0.0, y: 2.0 },
             tolerance,
         );
         test_polar_to_cartesian_helper(
@@ -485,7 +485,7 @@ mod tests {
                 theta: PI / 2.0,
             },
             center,
-            &Pos2 { x: 0.0, y: -2.0 },
+            &Pos2 { x: 2.0, y: 0.0 },
             tolerance,
         );
 
@@ -495,7 +495,7 @@ mod tests {
                 theta: PI,
             },
             center,
-            &Pos2 { x: -2.0, y: 0.0 },
+            &Pos2 { x: 0.0, y: -2.0 },
             tolerance,
         );
 
@@ -505,7 +505,7 @@ mod tests {
                 theta: 3.0 * PI / 2.0,
             },
             center,
-            &Pos2 { x: 0.0, y: 2.0 },
+            &Pos2 { x: -2.0, y: 0.0 },
             tolerance,
         );
     }
@@ -561,11 +561,6 @@ mod tests {
     }
 
     #[test]
-    fn test_polar_too_cartesian() {
-        //todo!();
-    }
-
-    #[test]
     fn test_cartesian_to_polar() {
         // This center will always have a positive x and y
         let center = Pos2 { x: 7.0, y: 3.0 };
@@ -575,7 +570,7 @@ mod tests {
             center,
             Polar2 {
                 radius: 1.0,
-                theta: 0.0,
+                theta: PI / 2.0,
             },
             tolerance,
         );
@@ -584,7 +579,7 @@ mod tests {
             center,
             Polar2 {
                 radius: 2.0,
-                theta: 0.0,
+                theta: PI / 2.0,
             },
             tolerance,
         );
@@ -593,7 +588,7 @@ mod tests {
             center,
             Polar2 {
                 radius: 2.0,
-                theta: -PI / 2.0,
+                theta: 0.0,
             },
             tolerance,
         );
@@ -603,7 +598,7 @@ mod tests {
             center,
             Polar2 {
                 radius: 2.0,
-                theta: PI,
+                theta: 3.0 * PI / 2.0,
             },
             tolerance,
         );
@@ -613,7 +608,7 @@ mod tests {
             center,
             Polar2 {
                 radius: 2.0,
-                theta: -3.0 * PI / 2.0,
+                theta: PI,
             },
             tolerance,
         );
