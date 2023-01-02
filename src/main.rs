@@ -20,15 +20,16 @@ struct MyEguiApp {
     theta_one_dot: f32,
     theta_two_dot: f32,
     outer: Polar2,
-    point: Pos2,
     is_dragging: bool,
+    is_dragging_p1: bool,
+    is_dragging_p2: bool,
     inner_mass: f32,
     outer_mass: f32,
     info: String,
     counter: usize,
     steps_per_tick: usize,
     granularity: f32,
-    playing:bool
+    playing: bool,
 }
 
 impl MyEguiApp {
@@ -38,7 +39,6 @@ impl MyEguiApp {
         outer_rod_length: f32,
     ) -> Self {
         Self {
-            point: Pos2 { x: 1.0, y: 2.0 },
             is_dragging: false,
             inner: Polar2 {
                 radius: inner_rod_length,
@@ -58,7 +58,9 @@ impl MyEguiApp {
             counter: 0,
             steps_per_tick: 10,
             granularity: 0.01,
-            playing:true,
+            playing: true,
+            is_dragging_p1: false,
+            is_dragging_p2: false,
         }
     }
 }
@@ -134,16 +136,25 @@ impl MyEguiApp {
         inner_rod_length: f32,
         outer_rod_length: f32,
     ) {
-        //let temp = Pos2 { x: 0.0, y: 0.0 };
         if ui.input().pointer.primary_down() {
             if let Some(thing) = { ui.input().pointer.interact_pos() } {
                 //temp = polar_to_cartesian(&cartesian_to_polar(thing, center), center);
                 //let thing = cartesian_to_polar(thing, center);
-                if self.is_dragging {
-                    self.outer = cartesian_to_polar(thing, center); // Might be able to not have this be the center later
 
-                    if self.outer.radius > total_radius {
-                        self.outer.radius = total_radius
+                // This should probably be fixed
+                if self.is_dragging {
+                    if self.is_dragging_p2 {
+                        self.outer = cartesian_to_polar(thing, center); // Might be able to not have this be the center later
+
+                        if self.outer.radius > total_radius {
+                            self.outer.radius = total_radius
+                        }
+                    } else if self.is_dragging_p1 {
+                        let radius = self.inner.radius;
+                        self.inner = cartesian_to_polar(thing, center);
+                        self.inner.radius = radius;
+                    } else {
+                        unreachable!();
                     }
                 } else if intersect_circle(
                     polar_to_cartesian(&self.outer, polar_to_cartesian(&self.inner, center)),
@@ -152,9 +163,17 @@ impl MyEguiApp {
                 ) {
                     self.outer = cartesian_to_polar(thing, center); // Might be able to not have this be the center later
                     self.is_dragging = true;
+                    self.is_dragging_p2 = true
+                } else if intersect_circle(polar_to_cartesian(&self.inner, center), 15.0, thing) {
+                    self.is_dragging = true;
+                    self.is_dragging_p1 = true;
+
+                    let radius = self.inner.radius;
+                    self.inner = cartesian_to_polar(thing, center);
+                    self.inner.radius = radius;
                 }
 
-                if self.is_dragging {
+                if self.is_dragging && self.is_dragging_p2 {
                     // Update inner based on where outer is
                     let distance = self.outer.radius;
                     if let Some((p1, p2)) = calculate_intersecting_points(
@@ -165,6 +184,7 @@ impl MyEguiApp {
                         outer_rod_length, // might have outer and inner backwards
                     ) {
                         let inner = polar_to_cartesian(&self.inner, center);
+
                         let delta_p1 = ((p1.x - inner.x).powi(2) + (p1.y - inner.y).powi(2)).sqrt();
                         let delta_p2 = ((p2.x - inner.x).powi(2) + (p2.y - inner.y).powi(2)).sqrt();
                         let _nan = Pos2 {
@@ -188,6 +208,8 @@ impl MyEguiApp {
             }
         } else if self.is_dragging {
             self.is_dragging = false;
+            self.is_dragging_p1 = false;
+            self.is_dragging_p2 = false;
             self.theta_one_dot = 0.0;
             self.theta_two_dot = 0.0;
         }
@@ -321,16 +343,12 @@ impl eframe::App for MyEguiApp {
 
             self.reset_button(ui);
 
-            if self.playing {
-                if ui.button("pause").clicked() {
-                    self.playing = false;
-                }
+            if self.playing && ui.button("pause").clicked() {
+                self.playing = false;
             }
 
-            if ! self.playing {
-                if ui.button("resume").clicked() {
-                    self.playing = true;
-                }
+            if !self.playing && ui.button("resume").clicked() {
+                self.playing = true;
             }
 
             self.handle_primary_mouse_button_down(
@@ -341,8 +359,7 @@ impl eframe::App for MyEguiApp {
                 self.outer.radius,
             );
 
-
-            if !self.is_dragging && self.playing{
+            if !self.is_dragging && self.playing {
                 self.simulation_step();
             }
 
@@ -438,6 +455,9 @@ fn _intersect_circle_polar(
 
 /// If there is too much overlap there nan will be returned.
 // This is because of taking the square root of a negative when x^2 > a_radius^2
+//
+// This also causes the jitter where when moving the inner rod length and out rod length will change
+// This appeared to be because of choosing the wrong p1 and p2, but it's actually because these points are just varying for some reason
 fn calculate_intersecting_points(
     b: Pos2,
     a: Pos2,
