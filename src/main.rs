@@ -24,6 +24,8 @@ struct MyEguiApp {
     is_dragging: bool,
     inner_mass: f32,
     outer_mass: f32,
+    info: String,
+    counter: usize,
 }
 
 impl MyEguiApp {
@@ -49,6 +51,8 @@ impl MyEguiApp {
             theta_two_dot: 0.0,
             inner_mass: 1.0,
             outer_mass: 1.0,
+            info: "".to_string(),
+            counter: 0,
         }
     }
 }
@@ -124,19 +128,23 @@ impl MyEguiApp {
         inner_rod_length: f32,
         outer_rod_length: f32,
     ) {
-        let mut temp = Pos2 { x: 0.0, y: 0.0 };
+        //let temp = Pos2 { x: 0.0, y: 0.0 };
         if ui.input().pointer.primary_down() {
             if let Some(thing) = { ui.input().pointer.interact_pos() } {
                 //temp = polar_to_cartesian(&cartesian_to_polar(thing, center), center);
                 //let thing = cartesian_to_polar(thing, center);
                 if self.is_dragging {
-                    self.outer = cartesian_to_polar(thing, center); // Might be able to not have this be the cneter later
+                    self.outer = cartesian_to_polar(thing, center); // Might be able to not have this be the center later
 
                     if self.outer.radius > total_radius {
                         self.outer.radius = total_radius
                     }
-                } else if _intersect_circle(polar_to_cartesian(&self.outer, polar_to_cartesian(&self.inner, center)), 15.0, thing) {
-                    self.outer = cartesian_to_polar(thing, center); // Might be able to not have this be the cneter later
+                } else if intersect_circle(
+                    polar_to_cartesian(&self.outer, polar_to_cartesian(&self.inner, center)),
+                    15.0,
+                    thing,
+                ) {
+                    self.outer = cartesian_to_polar(thing, center); // Might be able to not have this be the center later
                     self.is_dragging = true;
                 }
 
@@ -148,7 +156,7 @@ impl MyEguiApp {
                         polar_to_cartesian(&self.outer, center),
                         distance,
                         inner_rod_length,
-                        outer_rod_length // might have outer and inner backwards
+                        outer_rod_length, // might have outer and inner backwards
                     ) {
                         let inner = polar_to_cartesian(&self.inner, center);
                         let delta_p1 = ((p1.x - inner.x).powi(2) + (p1.y - inner.y).powi(2)).sqrt();
@@ -165,17 +173,18 @@ impl MyEguiApp {
                         } else {
                             self.inner = cartesian_to_polar(p1, center);
                         }
-                            self.outer = cartesian_to_polar(polar_to_cartesian(&self.outer, center), polar_to_cartesian(&self.inner, center))
+                        self.outer = cartesian_to_polar(
+                            polar_to_cartesian(&self.outer, center),
+                            polar_to_cartesian(&self.inner, center),
+                        )
                     }
                 } // end update inner
             }
-        } else {
+        } else if self.is_dragging {
             self.is_dragging = false;
             self.theta_one_dot = 0.0;
             self.theta_two_dot = 0.0;
         }
-        ui.painter()
-            .circle(temp, 10.0, Color32::WHITE, Stroke::default());
     }
 
     fn draw_pendulum(&mut self, ui: &mut Ui, center: Pos2) {
@@ -196,6 +205,56 @@ impl MyEguiApp {
         ui.painter()
             .line_segment([outer, inner], Stroke::new(3.0, Color32::LIGHT_RED));
     }
+
+    fn simulation_step(&mut self, time_interval: f32) {
+        for _ in 0..10 {
+            let theta_two_double_dot = self.calculate_theta_two_double_dot(
+                self.theta_one_dot,
+                self.inner.theta,
+                self.outer.theta,
+                self.inner_mass,
+                self.outer_mass,
+                self.inner_rod_length,
+                self.outer_rod_length,
+                9.8,
+                self.theta_two_dot,
+            );
+            let theta_one_double_dot = self.calculate_theta_one_double_dot(
+                theta_two_double_dot,
+                self.theta_two_dot,
+                self.inner.theta,
+                self.outer.theta,
+                self.inner_mass,
+                self.outer_mass,
+                self.inner_rod_length,
+                self.outer_rod_length,
+                9.8,
+            );
+
+
+            // Now calculate the updated theta_dot_values
+            self.theta_two_dot += theta_two_double_dot * time_interval;
+            self.theta_one_dot += theta_one_double_dot * time_interval;
+
+            let theta_two = self.outer.theta + self.theta_two_dot * time_interval;
+            let theta_one = self.inner.theta + self.theta_one_dot * time_interval;
+
+            self.inner.theta = theta_one;
+            self.outer.theta = theta_two;
+
+            self.info = format!("Theta_1{:#?}", self.inner.theta)
+                + "\n"
+                + &format!("Theta_1_dot{:#?}", &self.theta_one_dot)
+                + "\n"
+                + &format!("Theta_1_double_dot{:#?}", &self.theta_one_dot)
+                + "\n"
+                + &format!("Theta_2{:#?}", self.outer.theta)
+                + "\n"
+                + &format!("Theta_2_dot{:#?}", &self.theta_two_dot)
+                + "\n"
+                + &format!("Theta_2_double_dot{:#?}", &self.theta_two_dot);
+        }
+    }
 }
 impl eframe::App for MyEguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -203,7 +262,7 @@ impl eframe::App for MyEguiApp {
             ui.label(format!("{},{}", self.point.x, self.point.y));
             let available_size = ui.available_size();
             let total_radius: f32 = self.inner_rod_length + self.outer_rod_length;
-            let time_interval = 0.1; // This should have a slider or something
+            let time_interval = 0.01; // This should have a slider or something
             let center = Pos2 {
                 x: available_size.x / 2.0,
                 y: available_size.y / 2.0,
@@ -220,14 +279,68 @@ impl eframe::App for MyEguiApp {
                 self.inner_rod_length,
             );
 
+            if !self.is_dragging {
+                self.simulation_step(time_interval);
+            }
+
+            ui.label(&self.info);
+            ui.label(format!("counter:{}", self.counter));
+            self.counter += 1;
             self.draw_pendulum(ui, center);
         });
     }
 }
 
+impl MyEguiApp {
+    fn calculate_theta_one_double_dot(
+        &self,
+        theta_two_double_dot: f32,
+        theta_two_dot: f32,
+        theta_one: f32,
+        theta_two: f32,
+        mass_one: f32,
+        mass_two: f32,
+        r_one: f32,
+        r_two: f32,
+        g: f32,
+    ) -> f32 {
+        let a = mass_two * r_two;
+        let _b = mass_two * r_one;
+        let _c = mass_two * g;
+        let f = (mass_one + mass_two) * g;
+        let k = (mass_one + mass_two) * r_one;
+
+        -(a / k) * theta_two_double_dot * f32::cos(theta_one - theta_two)
+            - ((a / k) * (theta_two_dot.powi(2)) * f32::sin(theta_one - theta_two))
+            - (f / k) * f32::sin(theta_one)
+    }
+
+    fn calculate_theta_two_double_dot(
+        &self,
+        theta_one_dot: f32,
+        theta_one: f32,
+        theta_two: f32,
+        mass_one: f32,
+        mass_two: f32,
+        r_one: f32,
+        r_two: f32,
+        g: f32,
+        theta_two_dot: f32,
+    ) -> f32 {
+        let a = mass_two * r_two;
+        let b = mass_two * r_one;
+        let c = mass_two * g;
+        let f = (mass_one + mass_two) * g;
+        let k = (mass_one + mass_two) * r_one;
+
+        (1.0 / (a - ((b * a) / k) * (f32::cos(theta_one - theta_two).powi(2))))
+            * ((((a * b)/k)*theta_two_dot*f32::sin(theta_one-theta_two)*f32::cos(theta_one-theta_two))
+            + (((f*b)/k) * f32::sin(theta_one)*f32::cos(theta_one-theta_two)+b*(theta_one_dot.powi(2))*f32::sin(theta_one-theta_two) - c * f32::sin(theta_two)))
+    }
+}
 
 /// this uses the sqrt(deltax ^2 + deltay^2) so if the delta is great enough an overflow may occur
-fn _intersect_circle(object_center: Pos2, object_radius: f32, clicked_pos: Pos2) -> bool {
+fn intersect_circle(object_center: Pos2, object_radius: f32, clicked_pos: Pos2) -> bool {
     // This seems scuffed with both -
     object_radius
         >= ((object_center.x - clicked_pos.x).powi(2) + (object_center.y - clicked_pos.y).powi(2))
@@ -240,9 +353,8 @@ struct Polar2 {
     theta: f32,
 }
 
-fn intersect_circle_polar(main_object: &Polar2, object_radius: f32, other_object: &Polar2) -> bool {
+fn _intersect_circle_polar(main_object: &Polar2, object_radius: f32, other_object: &Polar2) -> bool {
     // https://www.kristakingmath.com/blog/distance-between-polar-points
-    //dbg!((main_object,other_object));
     object_radius
         >= (main_object.radius.powi(2) + other_object.radius.powi(2)
             - 2.0
@@ -403,7 +515,6 @@ mod tests {
             && compare_floats_with_variance(a.y, b.y, tolerance)
     }
     fn compare_polar2_with_tolerance(a: &Polar2, b: &Polar2, tolerance: f32) -> bool {
-        println!("---------");
         compare_floats_with_variance(a.radius, b.radius, tolerance)
             && compare_floats_with_variance(f32::sin(a.theta), f32::sin(b.theta), tolerance)
             && compare_floats_with_variance(f32::cos(a.theta), f32::cos(b.theta), tolerance)
