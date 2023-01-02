@@ -15,8 +15,8 @@ fn main() {
 #[derive(Default, Debug)]
 struct MyEguiApp {
     inner: Polar2,
-    inner_rod_length: f32,
-    outer_rod_length: f32,
+    //inner_rod_length: f32,
+    //outer_rod_length: f32,
     theta_one_dot: f32,
     theta_two_dot: f32,
     outer: Polar2,
@@ -26,6 +26,8 @@ struct MyEguiApp {
     outer_mass: f32,
     info: String,
     counter: usize,
+    steps_per_tick: usize,
+    granularity: f32,
 }
 
 impl MyEguiApp {
@@ -45,14 +47,16 @@ impl MyEguiApp {
                 radius: outer_rod_length,
                 theta: PI,
             },
-            inner_rod_length,
-            outer_rod_length,
+            // inner_rod_length,
+            // outer_rod_length,
             theta_one_dot: 0.0,
             theta_two_dot: 0.0,
-            inner_mass: 1.0,
-            outer_mass: 1.0,
+            inner_mass: 15.0,
+            outer_mass: 15.0,
             info: "".to_string(),
             counter: 0,
+            steps_per_tick: 10,
+            granularity: 0.01,
         }
     }
 }
@@ -105,14 +109,14 @@ fn polar_to_cartesian(input: &Polar2, center: Pos2) -> Pos2 {
 }
 
 impl MyEguiApp {
-    fn reset_button(&mut self, ui: &mut Ui, inner_rod_length: f32, outer_rod_length: f32) {
+    fn reset_button(&mut self, ui: &mut Ui) {
         if ui.button("reset").clicked() {
             self.inner = Polar2 {
-                radius: inner_rod_length,
+                radius: self.inner.radius,
                 theta: PI,
             };
             self.outer = Polar2 {
-                radius: outer_rod_length,
+                radius: self.outer.radius,
                 theta: PI,
             };
             self.theta_one_dot = 0.0;
@@ -196,26 +200,34 @@ impl MyEguiApp {
             Color32::GREEN,
             Stroke::new(1.0, Color32::GOLD),
         );
-        ui.painter()
-            .circle(inner, 15.0, Color32::RED, Stroke::default());
-        ui.painter()
-            .circle(outer, 15.0, Color32::BLUE, Stroke::default());
+        ui.painter().circle(
+            inner,
+            60.0 * (self.inner_mass / MASS_MAX),
+            Color32::RED,
+            Stroke::default(),
+        );
+        ui.painter().circle(
+            outer,
+            60.0 * (self.outer_mass / MASS_MAX),
+            Color32::BLUE,
+            Stroke::default(),
+        );
         ui.painter()
             .line_segment([inner, center], Stroke::new(3.0, Color32::LIGHT_RED));
         ui.painter()
             .line_segment([outer, inner], Stroke::new(3.0, Color32::LIGHT_RED));
     }
 
-    fn simulation_step(&mut self, time_interval: f32) {
-        for _ in 0..10 {
+    fn simulation_step(&mut self) {
+        for _ in 0..self.steps_per_tick {
             let theta_two_double_dot = self.calculate_theta_two_double_dot(
                 self.theta_one_dot,
                 self.inner.theta,
                 self.outer.theta,
                 self.inner_mass,
                 self.outer_mass,
-                self.inner_rod_length,
-                self.outer_rod_length,
+                self.inner.radius,
+                self.outer.radius,
                 9.8,
                 self.theta_two_dot,
             );
@@ -226,18 +238,17 @@ impl MyEguiApp {
                 self.outer.theta,
                 self.inner_mass,
                 self.outer_mass,
-                self.inner_rod_length,
-                self.outer_rod_length,
+                self.inner.radius,
+                self.outer.radius,
                 9.8,
             );
 
-
             // Now calculate the updated theta_dot_values
-            self.theta_two_dot += theta_two_double_dot * time_interval;
-            self.theta_one_dot += theta_one_double_dot * time_interval;
+            self.theta_two_dot += theta_two_double_dot * self.granularity;
+            self.theta_one_dot += theta_one_double_dot * self.granularity;
 
-            let theta_two = self.outer.theta + self.theta_two_dot * time_interval;
-            let theta_one = self.inner.theta + self.theta_one_dot * time_interval;
+            let theta_two = self.outer.theta + self.theta_two_dot * self.granularity;
+            let theta_one = self.inner.theta + self.theta_one_dot * self.granularity;
 
             self.inner.theta = theta_one;
             self.outer.theta = theta_two;
@@ -256,31 +267,69 @@ impl MyEguiApp {
         }
     }
 }
+
+const MASS_MAX: f32 = 100.0;
+const MAX_STEPS_PER_TICK: usize = 50;
+const MAX_GRANULARITY: f32 = 0.1;
+
 impl eframe::App for MyEguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.label(format!("{},{}", self.point.x, self.point.y));
+            ui.horizontal(|ui| {
+                ui.label("Inner rod length");
+                ui.add(egui::Slider::new(&mut self.inner.radius, 0.1..=500.0));
+            });
+            ui.horizontal(|ui| {
+                ui.label("Outer rod length");
+                ui.add(egui::Slider::new(&mut self.outer.radius, 0.1..=500.0));
+            });
+            ui.horizontal(|ui| {
+                ui.label("Inner point mass");
+                ui.add(egui::Slider::new(&mut self.inner_mass, 0.1..=MASS_MAX));
+            });
+            ui.horizontal(|ui| {
+                ui.label("Outer point mass");
+                ui.add(egui::Slider::new(&mut self.outer_mass, 0.1..=MASS_MAX));
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("Steps per tick point mass");
+                ui.add(egui::Slider::new(
+                    &mut self.steps_per_tick,
+                    1..=MAX_STEPS_PER_TICK,
+                ));
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("Accuracy of simulation (lower more accurate)");
+                ui.add(
+                    egui::Slider::new(&mut self.granularity, 0.001..=MAX_GRANULARITY)
+                        .fixed_decimals(3)
+                        .step_by(0.0001),
+                );
+            });
+
             let available_size = ui.available_size();
-            let total_radius: f32 = self.inner_rod_length + self.outer_rod_length;
-            let time_interval = 0.01; // This should have a slider or something
+            let total_radius: f32 = self.inner.radius + self.outer.radius;
             let center = Pos2 {
                 x: available_size.x / 2.0,
                 y: available_size.y / 2.0,
             };
             // Find the center of the screen
 
-            self.reset_button(ui, self.inner_rod_length, self.outer_rod_length);
+            self.reset_button(ui);
 
             self.handle_primary_mouse_button_down(
                 ui,
                 center,
                 total_radius,
-                self.outer_rod_length,
-                self.inner_rod_length,
+                self.inner.radius,
+                self.outer.radius,
             );
 
             if !self.is_dragging {
-                self.simulation_step(time_interval);
+                self.simulation_step();
             }
 
             ui.label(&self.info);
@@ -334,8 +383,13 @@ impl MyEguiApp {
         let k = (mass_one + mass_two) * r_one;
 
         (1.0 / (a - ((b * a) / k) * (f32::cos(theta_one - theta_two).powi(2))))
-            * ((((a * b)/k)*theta_two_dot*f32::sin(theta_one-theta_two)*f32::cos(theta_one-theta_two))
-            + (((f*b)/k) * f32::sin(theta_one)*f32::cos(theta_one-theta_two)+b*(theta_one_dot.powi(2))*f32::sin(theta_one-theta_two) - c * f32::sin(theta_two)))
+            * ((((a * b) / k)
+                * theta_two_dot
+                * f32::sin(theta_one - theta_two)
+                * f32::cos(theta_one - theta_two))
+                + (((f * b) / k) * f32::sin(theta_one) * f32::cos(theta_one - theta_two)
+                    + b * (theta_one_dot.powi(2)) * f32::sin(theta_one - theta_two)
+                    - c * f32::sin(theta_two)))
     }
 }
 
@@ -353,7 +407,11 @@ struct Polar2 {
     theta: f32,
 }
 
-fn _intersect_circle_polar(main_object: &Polar2, object_radius: f32, other_object: &Polar2) -> bool {
+fn _intersect_circle_polar(
+    main_object: &Polar2,
+    object_radius: f32,
+    other_object: &Polar2,
+) -> bool {
     // https://www.kristakingmath.com/blog/distance-between-polar-points
     object_radius
         >= (main_object.radius.powi(2) + other_object.radius.powi(2)
