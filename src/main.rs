@@ -25,10 +25,10 @@ struct MyEguiApp {
     is_dragging_p2: bool,
     inner_mass: f32,
     outer_mass: f32,
-    info: String,
     counter: usize,
     steps_per_tick: usize,
     granularity: f32,
+    gravity: f32,
     playing: bool,
 }
 
@@ -54,10 +54,10 @@ impl MyEguiApp {
             theta_two_dot: 0.0,
             inner_mass: 15.0,
             outer_mass: 15.0,
-            info: "".to_string(),
             counter: 0,
             steps_per_tick: 10,
             granularity: 0.01,
+            gravity: 9.8,
             playing: true,
             is_dragging_p1: false,
             is_dragging_p2: false,
@@ -252,7 +252,7 @@ impl MyEguiApp {
                 self.outer_mass,
                 self.inner.radius,
                 self.outer.radius,
-                9.8,
+                self.gravity,
                 self.theta_two_dot,
             );
             let theta_one_double_dot = self.calculate_theta_one_double_dot(
@@ -264,7 +264,7 @@ impl MyEguiApp {
                 self.outer_mass,
                 self.inner.radius,
                 self.outer.radius,
-                9.8,
+                self.gravity,
             );
 
             // Now calculate the updated theta_dot_values
@@ -276,23 +276,12 @@ impl MyEguiApp {
 
             self.inner.theta = theta_one;
             self.outer.theta = theta_two;
-
-            self.info = format!("Theta_1{:#?}", self.inner.theta)
-                + "\n"
-                + &format!("Theta_1_dot{:#?}", &self.theta_one_dot)
-                + "\n"
-                + &format!("Theta_1_double_dot{:#?}", &self.theta_one_dot)
-                + "\n"
-                + &format!("Theta_2{:#?}", self.outer.theta)
-                + "\n"
-                + &format!("Theta_2_dot{:#?}", &self.theta_two_dot)
-                + "\n"
-                + &format!("Theta_2_double_dot{:#?}", &self.theta_two_dot);
         }
     }
 }
 
 const MASS_MAX: f32 = 100.0;
+const MASS_GRAVITY: f32 = 20.0;
 const MAX_STEPS_PER_TICK: usize = 50;
 const MAX_GRANULARITY: f32 = 0.1;
 
@@ -314,6 +303,10 @@ impl eframe::App for MyEguiApp {
             ui.horizontal(|ui| {
                 ui.label("Outer point mass");
                 ui.add(egui::Slider::new(&mut self.outer_mass, 0.1..=MASS_MAX));
+            });
+            ui.horizontal(|ui| {
+                ui.label("Gravity");
+                ui.add(egui::Slider::new(&mut self.gravity, 0.1..=MASS_GRAVITY));
             });
 
             ui.horizontal(|ui| {
@@ -361,11 +354,10 @@ impl eframe::App for MyEguiApp {
 
             if !self.is_dragging && self.playing {
                 self.simulation_step();
+                self.counter += 1;
             }
 
-            ui.label(&self.info);
-            ui.label(format!("counter:{}", self.counter));
-            self.counter += 1;
+            ui.label(format!("tick_count:{}", self.counter));
             self.draw_pendulum(ui, center);
         });
     }
