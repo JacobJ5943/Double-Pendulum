@@ -216,7 +216,6 @@ impl MyEguiApp {
             self.theta_one_dot = 0.0;
             self.theta_two_dot = 0.0;
         }
-
     }
 
     /// At the moment this function relies on self.outer being a polar coordinate with the center being the center
@@ -242,22 +241,27 @@ impl MyEguiApp {
             };
 
             match (p1.x.is_nan(), p2.x.is_nan()) {
-                (true, true) => {}
-                (true, false) => todo!(),
-                (false, true) => todo!(),
+                (true, true) => {
+                    self.outer = cartesian_to_polar(
+                        polar_to_cartesian(&self.outer, center),
+                        polar_to_cartesian(&self.inner, center),
+                    );
+                    self.outer.radius = outer_rod_length;
+                }
+                (true, false) | (false, true) => unreachable!(),
                 (false, false) => {
                     if delta_p1 > delta_p2 {
                         self.inner = cartesian_to_polar(p2, center);
                     } else {
                         self.inner = cartesian_to_polar(p1, center);
                     }
+                    self.outer = cartesian_to_polar(
+                        polar_to_cartesian(&self.outer, center),
+                        polar_to_cartesian(&self.inner, center),
+                    );
                 }
             }
         }
-        self.outer = cartesian_to_polar(
-            polar_to_cartesian(&self.outer, center),
-            polar_to_cartesian(&self.inner, center),
-        )
     }
 
     fn draw_pendulum(&mut self, ui: &mut Ui, center: Pos2) {

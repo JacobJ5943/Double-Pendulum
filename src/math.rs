@@ -59,6 +59,7 @@ pub fn polar_to_cartesian(input: &Polar2, center: Pos2) -> Pos2 {
 }
 
 //  source https://planetcalc.com/8098/
+/// If you point returned is NaN the other is guaranteed to be NaN as well
 pub fn calculate_intersecting_points(
     pos_a: Pos2,
     pos_b: Pos2,
@@ -66,22 +67,22 @@ pub fn calculate_intersecting_points(
     a_radius: f32,
     b_radius: f32,
 ) -> Option<(Pos2, Pos2)> {
-    let a = (a_radius.powi(2)-b_radius.powi(2) + distance.powi(2)) / (2.0 * distance);
+    let a = (a_radius.powi(2) - b_radius.powi(2) + distance.powi(2)) / (2.0 * distance);
     let h = (a_radius.powi(2) - a.powi(2)).sqrt();
-    let x_3 = pos_a.x + (a/distance) * (pos_b.x - pos_a.x);
-    let y_3 = pos_a.y + (a/distance) * (pos_b.y - pos_a.y);
+    let x_3 = pos_a.x + (a / distance) * (pos_b.x - pos_a.x);
+    let y_3 = pos_a.y + (a / distance) * (pos_b.y - pos_a.y);
 
     let p1 = Pos2 {
-        x: x_3 + (h/distance)*(pos_b.y - pos_a.y),
-        y: y_3 - (h/distance)*(pos_b.x - pos_a.x),
+        x: x_3 + (h / distance) * (pos_b.y - pos_a.y),
+        y: y_3 - (h / distance) * (pos_b.x - pos_a.x),
     };
 
     let p2 = Pos2 {
-        x: x_3 - (h/distance)*(pos_b.y - pos_a.y),
-        y: y_3 + (h/distance)*(pos_b.x - pos_a.x),
+        x: x_3 - (h / distance) * (pos_b.y - pos_a.y),
+        y: y_3 + (h / distance) * (pos_b.x - pos_a.x),
     };
 
-    Some((p1,p2))
+    Some((p1, p2))
 }
 
 /// Equation of motion
