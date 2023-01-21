@@ -73,7 +73,6 @@ impl eframe::App for MyEguiApp {
             });
 
             let available_size = ui.available_size();
-            let total_radius: f32 = self.inner.radius + self.outer.radius;
             let center = Pos2 {
                 x: available_size.x / 2.0,
                 y: available_size.y / 2.0,
@@ -90,13 +89,7 @@ impl eframe::App for MyEguiApp {
                 self.playing = true;
             }
 
-            self.handle_primary_mouse_button_down(
-                ui,
-                center,
-                total_radius,
-                self.inner.radius,
-                self.outer.radius,
-            );
+            self.handle_primary_mouse_button_down(ui, center, self.inner.radius, self.outer.radius);
 
             if !self.is_dragging && self.playing {
                 self.simulation_step();
@@ -165,7 +158,6 @@ impl MyEguiApp {
         &mut self,
         ui: &mut Ui,
         center: Pos2,
-        total_radius: f32,
         inner_rod_length: f32,
         outer_rod_length: f32,
     ) {
@@ -174,9 +166,13 @@ impl MyEguiApp {
                 // This should probably be fixed
                 if self.is_dragging {
                     if self.is_dragging_p2 {
-                        self.outer = cartesian_to_polar(pointer_pos, center); // Might be able to not have this be the center later
-                        if self.outer.radius > total_radius {
-                            self.outer.radius = total_radius
+                        let pointer_polar = cartesian_to_polar(pointer_pos, center); // Might be able to not have this be the center later
+                        if pointer_polar.radius >= inner_rod_length + outer_rod_length {
+                            self.outer.theta = pointer_polar.theta;
+                            self.inner.theta = pointer_polar.theta;
+                        } else {
+                            self.outer = pointer_polar;
+                            self.dragging_p2(center, outer_rod_length);
                         }
                     } else if self.is_dragging_p1 {
                         let radius = self.inner.radius;
@@ -190,49 +186,27 @@ impl MyEguiApp {
                     15.0,
                     pointer_pos,
                 ) {
-                    self.outer = cartesian_to_polar(pointer_pos, center); // Might be able to not have this be the center later
+                    let pointer_polar = cartesian_to_polar(pointer_pos, center); // Might be able to not have this be the center later
+                    if pointer_polar.radius >= inner_rod_length + outer_rod_length {
+                        self.outer.theta = pointer_polar.theta;
+                        self.inner.theta = pointer_polar.theta;
+                    } else {
+                        self.outer = pointer_polar;
+                        self.dragging_p2(center, outer_rod_length);
+                    }
                     self.is_dragging = true;
-                    self.is_dragging_p2 = true
-                } else if intersect_circle(polar_to_cartesian(&self.inner, center), 15.0, pointer_pos) {
+                    self.is_dragging_p2 = true;
+                } else if intersect_circle(
+                    polar_to_cartesian(&self.inner, center),
+                    15.0,
+                    pointer_pos,
+                ) {
                     self.is_dragging = true;
                     self.is_dragging_p1 = true;
 
                     let radius = self.inner.radius;
                     self.inner = cartesian_to_polar(pointer_pos, center);
                     self.inner.radius = radius;
-                }
-
-                if self.is_dragging && self.is_dragging_p2 {
-                    // Update inner based on where outer is
-                    let distance = self.outer.radius;
-                    if let Some((p1, p2)) = calculate_intersecting_points(
-                        center,
-                        polar_to_cartesian(&self.outer, center),
-                        distance,
-                        inner_rod_length,
-                        outer_rod_length, // might have outer and inner backwards
-                    ) {
-                        let inner = polar_to_cartesian(&self.inner, center);
-
-                        let delta_p1 = ((p1.x - inner.x).powi(2) + (p1.y - inner.y).powi(2)).sqrt();
-                        let delta_p2 = ((p2.x - inner.x).powi(2) + (p2.y - inner.y).powi(2)).sqrt();
-                        let _nan = Pos2 {
-                            x: f32::NAN,
-                            y: f32::NAN,
-                        };
-
-                        if p1.x.is_nan() && p2.x.is_nan() {
-                            // dbg!((p1,p2));
-                        } else if delta_p1 > delta_p2 {
-                            self.inner = cartesian_to_polar(p2, center);
-                        } else {
-                            self.inner = cartesian_to_polar(p1, center);
-                        }
-                        self.outer = cartesian_to_polar(
-                            polar_to_cartesian(&self.outer, center),
-                            polar_to_cartesian(&self.inner, center),
-                        )
-                    }
                 }
             }
         } else if self.is_dragging {
@@ -242,6 +216,48 @@ impl MyEguiApp {
             self.theta_one_dot = 0.0;
             self.theta_two_dot = 0.0;
         }
+
+    }
+
+    /// At the moment this function relies on self.outer being a polar coordinate with the center being the center
+    /// and not self.inner
+    fn dragging_p2(&mut self, center: Pos2, outer_rod_length: f32) {
+        // Update inner based on where outer is
+        //ui.painter().circle(polar_to_cartesian(&self.outer, center), self.outer.radius, fill_color, stroke)
+        let distance = self.outer.radius;
+        if let Some((p1, p2)) = calculate_intersecting_points(
+            center,
+            polar_to_cartesian(&self.outer, center),
+            distance,
+            self.inner.radius,
+            outer_rod_length, // might have outer and inner backwards
+        ) {
+            let inner = polar_to_cartesian(&self.inner, center);
+
+            let delta_p1 = ((p1.x - inner.x).powi(2) + (p1.y - inner.y).powi(2)).sqrt();
+            let delta_p2 = ((p2.x - inner.x).powi(2) + (p2.y - inner.y).powi(2)).sqrt();
+            let _nan = Pos2 {
+                x: f32::NAN,
+                y: f32::NAN,
+            };
+
+            match (p1.x.is_nan(), p2.x.is_nan()) {
+                (true, true) => {}
+                (true, false) => todo!(),
+                (false, true) => todo!(),
+                (false, false) => {
+                    if delta_p1 > delta_p2 {
+                        self.inner = cartesian_to_polar(p2, center);
+                    } else {
+                        self.inner = cartesian_to_polar(p1, center);
+                    }
+                }
+            }
+        }
+        self.outer = cartesian_to_polar(
+            polar_to_cartesian(&self.outer, center),
+            polar_to_cartesian(&self.inner, center),
+        )
     }
 
     fn draw_pendulum(&mut self, ui: &mut Ui, center: Pos2) {

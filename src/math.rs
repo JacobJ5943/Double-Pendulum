@@ -22,7 +22,6 @@ pub fn cartesian_to_polar(input: Pos2, center: Pos2) -> Polar2 {
 
     let delta_y = center.y - input.y;
     let delta_x = center.x - input.x;
-    //dbg!((delta_y, delta_x));
 
     let mut theta = -f32::atan(delta_y / delta_x);
     if delta_x > 0.0 {
