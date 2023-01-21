@@ -44,7 +44,6 @@ $\ddot{\theta_2}=(\dfrac{1}{a-\dfrac{ba}{k}\cos^2(\theta_1 - \theta_2)})(\dfrac{
 
 
 # Issues
-- When moving the outer point the inner point rapidly changes places.  This is because of how I calculate where I can be with the rod lengths and then choose what should be the closest.
 - Simulation time tied to interaction.
 - I haven't graphed the potential energy vs kinetic energy yet so there may be an issue with my equations of motion
 - If performance is an issue a good place to start looking is how often I change from polar to cartesian.
