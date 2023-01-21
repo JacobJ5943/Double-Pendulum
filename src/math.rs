@@ -59,35 +59,30 @@ pub fn polar_to_cartesian(input: &Polar2, center: Pos2) -> Pos2 {
     }
 }
 
-/// If there is too much overlap there nan will be returned.
-// This is because of taking the square root of a negative when x^2 > a_radius^2
-//
-// This also causes the jitter where when moving the inner rod length and out rod length will change
-// This appeared to be because of choosing the wrong p1 and p2, but it's actually because these points are just varying for some reason
+//  source https://planetcalc.com/8098/
 pub fn calculate_intersecting_points(
-    b: Pos2,
-    a: Pos2,
-    d: f32,
+    pos_a: Pos2,
+    pos_b: Pos2,
+    distance: f32, // distance between pos_a and pos_b
     a_radius: f32,
     b_radius: f32,
 ) -> Option<(Pos2, Pos2)> {
-    let ex = (b.x - a.x) / d;
-    let ey = (b.y - a.y) / d;
-
-    let x = (a_radius * a_radius - b_radius * b_radius + d * d) / (2.0 * d);
-    // This line is the reason for the position not being updated if the outer circle is intersecting the center circle
-    let y = (a_radius * a_radius - x * x).sqrt();
+    let a = (a_radius.powi(2)-b_radius.powi(2) + distance.powi(2)) / (2.0 * distance);
+    let h = (a_radius.powi(2) - a.powi(2)).sqrt();
+    let x_3 = pos_a.x + (a/distance) * (pos_b.x - pos_a.x);
+    let y_3 = pos_a.y + (a/distance) * (pos_b.y - pos_a.y);
 
     let p1 = Pos2 {
-        x: a.x + x * ex - y * ey,
-        y: a.y + x * ey + y * ex,
+        x: x_3 + (h/distance)*(pos_b.y - pos_a.y),
+        y: y_3 - (h/distance)*(pos_b.x - pos_a.x),
     };
 
     let p2 = Pos2 {
-        x: a.x + x * ex + y * ey,
-        y: a.y + x * ey - y * ex,
+        x: x_3 - (h/distance)*(pos_b.y - pos_a.y),
+        y: y_3 + (h/distance)*(pos_b.x - pos_a.x),
     };
-    Some((p1, p2))
+
+    Some((p1,p2))
 }
 
 /// Equation of motion

@@ -170,18 +170,17 @@ impl MyEguiApp {
         outer_rod_length: f32,
     ) {
         if ui.input().pointer.primary_down() {
-            if let Some(thing) = { ui.input().pointer.interact_pos() } {
+            if let Some(pointer_pos) = { ui.input().pointer.interact_pos() } {
                 // This should probably be fixed
                 if self.is_dragging {
                     if self.is_dragging_p2 {
-                        self.outer = cartesian_to_polar(thing, center); // Might be able to not have this be the center later
-
+                        self.outer = cartesian_to_polar(pointer_pos, center); // Might be able to not have this be the center later
                         if self.outer.radius > total_radius {
                             self.outer.radius = total_radius
                         }
                     } else if self.is_dragging_p1 {
                         let radius = self.inner.radius;
-                        self.inner = cartesian_to_polar(thing, center);
+                        self.inner = cartesian_to_polar(pointer_pos, center);
                         self.inner.radius = radius;
                     } else {
                         unreachable!();
@@ -189,17 +188,17 @@ impl MyEguiApp {
                 } else if intersect_circle(
                     polar_to_cartesian(&self.outer, polar_to_cartesian(&self.inner, center)),
                     15.0,
-                    thing,
+                    pointer_pos,
                 ) {
-                    self.outer = cartesian_to_polar(thing, center); // Might be able to not have this be the center later
+                    self.outer = cartesian_to_polar(pointer_pos, center); // Might be able to not have this be the center later
                     self.is_dragging = true;
                     self.is_dragging_p2 = true
-                } else if intersect_circle(polar_to_cartesian(&self.inner, center), 15.0, thing) {
+                } else if intersect_circle(polar_to_cartesian(&self.inner, center), 15.0, pointer_pos) {
                     self.is_dragging = true;
                     self.is_dragging_p1 = true;
 
                     let radius = self.inner.radius;
-                    self.inner = cartesian_to_polar(thing, center);
+                    self.inner = cartesian_to_polar(pointer_pos, center);
                     self.inner.radius = radius;
                 }
 
