@@ -44,6 +44,6 @@ $\ddot{\theta_2}=(\dfrac{1}{a-\dfrac{ba}{k}\cos^2(\theta_1 - \theta_2)})(\dfrac{
 
 
 # Issues
-- Simulation time tied to interaction.
+- The simulation will update more frequently while user input is received
 - I haven't graphed the potential energy vs kinetic energy yet so there may be an issue with my equations of motion
 - If performance is an issue a good place to start looking is how often I change from polar to cartesian.

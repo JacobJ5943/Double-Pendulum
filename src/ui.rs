@@ -1,7 +1,8 @@
 use std::f32::consts::PI;
+use std::time::Duration;
 
 use crate::{
-    constants::{MASS_GRAVITY, MASS_MAX, MAX_GRANULARITY, MAX_STEPS_PER_TICK},
+    constants::{MASS_GRAVITY, MASS_MAX, MAX_FRAMERATE, MAX_GRANULARITY, MAX_STEPS_PER_TICK},
     math::{
         calculate_intersecting_points, calculate_theta_one_double_dot,
         calculate_theta_two_double_dot, cartesian_to_polar, intersect_circle, polar_to_cartesian,
@@ -28,6 +29,7 @@ pub struct MyEguiApp {
     steps_per_tick: usize,
     granularity: f32,
     gravity: f32,
+    frame_rate: f32,
     playing: bool,
 }
 
@@ -61,6 +63,10 @@ impl eframe::App for MyEguiApp {
                     &mut self.steps_per_tick,
                     1..=MAX_STEPS_PER_TICK,
                 ));
+            });
+            ui.horizontal(|ui| {
+                ui.label("Desired frame rate");
+                ui.add(egui::Slider::new(&mut self.frame_rate, 1.0..=MAX_FRAMERATE));
             });
 
             ui.horizontal(|ui| {
@@ -99,6 +105,11 @@ impl eframe::App for MyEguiApp {
             ui.label(format!("tick_count:{}", self.counter));
             self.draw_pendulum(ui, center);
         });
+
+        // roughly 1/144 seconds
+        ctx.request_repaint_after(Duration::from_nanos(
+            (1000000000.0 / self.frame_rate) as u64,
+        ));
     }
 }
 
@@ -126,6 +137,7 @@ impl MyEguiApp {
             steps_per_tick: 10,
             granularity: 0.01,
             gravity: 9.8,
+            frame_rate: 144.0,
             playing: true,
             is_dragging_p1: false,
             is_dragging_p2: false,
